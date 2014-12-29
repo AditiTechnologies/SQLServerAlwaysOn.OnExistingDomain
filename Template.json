@@ -117,9 +117,9 @@
         {
             "Name": "DatabaseName",
             "Type": "String",
-            "Description": "Name of the database which is to be added to the SQL Server Availability Group.",
-            "Minimum": 1,
-            "Maximum": 64
+            "Description": "Name of the database which is to be added to the SQL Server Availability Group. This is optional.",
+            "Maximum": 64,
+			"Default":""
         },
         {
             "Name": "NumberOfSQLNodes",

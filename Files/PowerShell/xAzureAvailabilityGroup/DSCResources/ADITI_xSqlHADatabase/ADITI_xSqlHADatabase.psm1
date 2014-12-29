@@ -13,23 +13,16 @@ function Get-TargetResource
         [ValidateNotNullOrEmpty()]
         [string] $AvailabilityGroupName,
 
-        [parameter(Mandatory)]
-        [ValidateNotNull()]
-	    [string[]] $Database,        
+        [string] $Database,
 
         [parameter(Mandatory)]
         [ValidateNotNullOrEmpty()]
-	    [string] $DatabaseBackupPath,        
+	    [string] $DatabaseBackupPath,
         
         [Parameter(Mandatory)]
         [ValidateNotNullOrEmpty()]
         [PSCredential] $SqlAdministratorCredential	
   	)
-
-    if ($Database.Count -lt 1)
-    {
-        throw "Parameter Database does not have any database"
-    }    
 
     $returnValue = @{
  
@@ -53,82 +46,76 @@ function Set-TargetResource
         [ValidateNotNullOrEmpty()]
         [string] $AvailabilityGroupName,
 
-        [parameter(Mandatory)]
-        [ValidateNotNull()]
-	    [string[]] $Database,        
+        [string] $Database,
 
         [parameter(Mandatory)]
         [ValidateNotNullOrEmpty()]
-	    [string] $DatabaseBackupPath,        
+	    [string] $DatabaseBackupPath,
         
         [Parameter(Mandatory)]
         [ValidateNotNullOrEmpty()]
         [PSCredential] $SqlAdministratorCredential	
   	)
    
-    if ($Database.Count -lt 1)
+    if([System.String]::IsNullOrEmpty($Database) -or [System.String]::IsNullOrWhiteSpace($Database))
     {
-        throw "Parameter Database does not have any database"
-    }    
+        return
+    }
 
     $sa = $SqlAdministratorCredential.UserName
     $saPassword = $SqlAdministratorCredential.GetNetworkCredential().Password    
     
-    # restore database
-    foreach($db in $Database)
-    {
-        $role = [int] (osql -S . -U $sa -P $saPassword -Q "select role from sys.dm_hadr_availability_replica_states where is_local = 1" -h-1)[0]
-        $dbExists = [bool] [int](osql -S . -U $sa -P $saPassword -Q "select count(*) from master.sys.databases where name = '$db'" -h-1)[0]
-        $dbIsAddedToAg = [bool] [int](osql -S . -U $sa -P $saPassword -Q "select count(*) from sys.dm_hadr_database_replica_states inner join sys.databases on sys.databases.database_id = sys.dm_hadr_database_replica_states.database_id where sys.databases.name = '$db'" -h-1)[0]
+    $role = [int] (osql -S . -U $sa -P $saPassword -Q "select role from sys.dm_hadr_availability_replica_states where is_local = 1" -h-1)[0]
+    $dbExists = [bool] [int](osql -S . -U $sa -P $saPassword -Q "select count(*) from master.sys.databases where name = '$Database'" -h-1)[0]
+    $dbIsAddedToAg = [bool] [int](osql -S . -U $sa -P $saPassword -Q "select count(*) from sys.dm_hadr_database_replica_states inner join sys.databases on sys.databases.database_id = sys.dm_hadr_database_replica_states.database_id where sys.databases.name = '$Database'" -h-1)[0]
 
-        if($role -eq 1) # If PRIMARY replica
-        {            
-            if(!$dbExists)
-            {
-                # create DB
-                osql -S . -U $sa -P $saPassword -Q "create database $db"
-            }
-            # take backup
-            Write-Verbose -Message "Backup to $DatabaseBackupPath .."
-            osql -S . -U $sa -P $saPassword -Q "backup database $db to disk = '$DatabaseBackupPath\$db.bak' with format"
-            osql -S . -U $sa -P $saPassword -Q "backup log $db to disk = '$DatabaseBackupPath\$db.log' with noformat"
+    if($role -eq 1) # If PRIMARY replica
+    {            
+       if(!$dbExists)
+       {
+           # create DB
+           osql -S . -U $sa -P $saPassword -Q "create database $Database"
+       }
+       # take backup
+       Write-Verbose -Message "Backup to $DatabaseBackupPath .."
+       osql -S . -U $sa -P $saPassword -Q "backup database $Database to disk = '$DatabaseBackupPath\$Database.bak' with format"
+       osql -S . -U $sa -P $saPassword -Q "backup log $Database to disk = '$DatabaseBackupPath\$Database.log' with noformat"
 
-            if(!$dbIsAddedToAg)
-            {
-                osql -S . -U $sa -P $saPassword -Q "ALTER AVAILABILITY GROUP $AvailabilityGroupName ADD DATABASE $db"                
-            }
+       if(!$dbIsAddedToAg)
+       {
+           osql -S . -U $sa -P $saPassword -Q "ALTER AVAILABILITY GROUP $AvailabilityGroupName ADD DATABASE $Database"                
+       }
+     }
+
+     elseif($role -eq 2 -or $role -eq 0 ) # If SECONDARY replica or yet to be added as a replica
+     {
+        $isJoinedToAg = [bool] [int](osql -S . -U $sa -P $saPassword -Q "select count(*) from sys.availability_groups where name = '$AvailabilityGroupName'" -h-1)[0]
+        if(!$isJoinedToAg)
+        {
+            # Join AG
+            osql -S . -U $sa -P $saPassword -Q "ALTER AVAILABILITY GROUP $AvailabilityGroupName JOIN"
         }
 
-        elseif($role -eq 2 -or $role -eq 0 ) # If SECONDARY replica or yet to be added as a replica
+        # Restore DB if not exists
+        if(!$dbExists)
         {
-            $isJoinedToAg = [bool] [int](osql -S . -U $sa -P $saPassword -Q "select count(*) from sys.availability_groups where name = '$AvailabilityGroupName'" -h-1)[0]
-            if(!$isJoinedToAg)
-            {
-                # Join AG
-                osql -S . -U $sa -P $saPassword -Q "ALTER AVAILABILITY GROUP $AvailabilityGroupName JOIN"
-            }
+            WaitForDatabase -DbName $Database -DbBackupFolder $DatabaseBackupPath
 
-            # Restore DB if not exists
-            if(!$dbExists)
-            {
-                WaitForDatabase -DbName $db -DbBackupFolder $DatabaseBackupPath
+            $query = "restore database $Database from disk = '$DatabaseBackupPath\$Database.bak' with norecovery"
+            Write-Verbose -Message "Query: $query"
+            osql -S . -U $sa -P $saPassword -Q $query        
 
-                $query = "restore database $db from disk = '$DatabaseBackupPath\$db.bak' with norecovery"
-                Write-Verbose -Message "Query: $query"
-                osql -S . -U $sa -P $saPassword -Q $query        
-
-                $query = "restore log $db from disk = '$DatabaseBackupPath\$db.log' with norecovery"
-                Write-Verbose -Message "Query: $query"
-	            osql -S . -U $sa -P $saPassword -Q $query                
-            }
+            $query = "restore log $Database from disk = '$DatabaseBackupPath\$Database.log' with norecovery"
+            Write-Verbose -Message "Query: $query"
+	        osql -S . -U $sa -P $saPassword -Q $query                
+        }
                         
-            if(!$dbIsAddedToAg)
-            {
-                # Add database to AG
-	            osql -S . -U $sa -P $saPassword -Q "ALTER DATABASE $db SET HADR AVAILABILITY GROUP = $AvailabilityGroupName"
-            }
-        }        
-    }
+        if(!$dbIsAddedToAg)
+        {
+            # Add database to AG
+	        osql -S . -U $sa -P $saPassword -Q "ALTER DATABASE $Database SET HADR AVAILABILITY GROUP = $AvailabilityGroupName"
+        }
+     }    
 }
 
 #
@@ -142,13 +129,11 @@ function Test-TargetResource
         [ValidateNotNullOrEmpty()]
         [string] $AvailabilityGroupName,
 
-        [parameter(Mandatory)]
-        [ValidateNotNull()]
-	    [string[]] $Database,        
+        [string] $Database,
 
         [parameter(Mandatory)]
         [ValidateNotNullOrEmpty()]
-	    [string] $DatabaseBackupPath,        
+	    [string] $DatabaseBackupPath,
         
         [Parameter(Mandatory)]
         [ValidateNotNullOrEmpty()]

@@ -323,7 +323,7 @@
                     "Rules": [],
 					"InternalLoadBalancerName": "AGListenerLB",
                     "LoadBalancerProbe": {
-                        "Name": "AGListenerLBProbe",
+                        "Name": "AGListenerProbe",
                         "Protocol": "tcp",
                         "Port": 59999
                     }

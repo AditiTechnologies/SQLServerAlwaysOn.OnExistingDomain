@@ -38,6 +38,12 @@
             "Description": "Address space of subnet within which SQL Availability Group VMs will be created.",
             "Default": "10.20.2.0/24"
         },
+		{
+            "Name": "AGListenerStaticIPAddress",
+            "Type": "String",
+            "Description": "Static IP Address for availability group listener. This address must lie within the specified subnet for SQL Availability Group VMs.",
+            "Default": "10.20.2.100"
+        },
         {
             "Name": "DiskStore",
             "Type": "String",
@@ -266,7 +272,12 @@
                     }
 					{% endfor -%}
                 ],
-                "DiskStorageAccount": "{{DiskStore}}"
+                "DiskStorageAccount": "{{DiskStore}}",
+				"InternalLoadBalancer": {
+					"Name": "AGListenerLB",
+					"Subnet": "{{SqlSubnetName}}",
+					"StaticVNetIPAddress":"{{AGListenerStaticIPAddress}}"
+				}
             }
         }
     ],
@@ -310,8 +321,9 @@
                     "Port": 1433,
                     "EnableDirectServerReturn": true,
                     "Rules": [],
+					"InternalLoadBalancerName": "AGListenerLB",
                     "LoadBalancerProbe": {
-                        "Name": "AGListener-LB",
+                        "Name": "AGListenerLBProbe",
                         "Protocol": "tcp",
                         "Port": 59999
                     }
@@ -730,7 +742,7 @@
                     "Name": "CreateAGListener",
                     "Args": {
                         "Name": "{{AvailabilityGroupName}}Listener",
-                        "ServiceName": "{{CloudService}}",
+                        "AvailabilityGroupIPAddress": "{{AGListenerStaticIPAddress}}",
                         "AvailabilityGroupName": "{{AvailabilityGroupName}}",
                         "SqlAdministratorCredential": "%%New-Object PSCredential 'sa', (ConvertTo-SecureString '{{SqlAdminPassword}}' -AsPlainText -Force)",
                         "DomainAdministratorCredential": "%%New-Object PSCredential '{{Domain}}\\{{DomainJoinUserName}}', (ConvertTo-SecureString '{{DomainJoinUserPassword}}' -AsPlainText -Force)"

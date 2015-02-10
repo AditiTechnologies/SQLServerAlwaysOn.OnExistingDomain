@@ -13,7 +13,7 @@ function Get-TargetResource
         [string] $Name,
 		
 		[Parameter(Mandatory)]
-		$ServiceName,		
+        $AvailabilityGroupIPAddress,
 		
 		[Parameter(Mandatory=$true)]
 		$AvailabilityGroupName,	
@@ -31,7 +31,7 @@ function Get-TargetResource
     
     $retvalue = @{
         Name = $Name
-        IPAddress = "someval"
+        IPAddress = $AvailabilityGroupIPAddress
     }
 }
 
@@ -49,7 +49,7 @@ function Set-TargetResource
 		$ServiceName,		
 		
 		[Parameter(Mandatory=$true)]
-		$AvailabilityGroupName,	
+		$AvailabilityGroupIPAddress,
 	
 		[UInt32] $PublicPort = 1433,	
 	
@@ -67,21 +67,20 @@ function Set-TargetResource
 	
     try
     {
-        ($oldToken, $context, $newToken) = ImpersonateAs -cred $DomainAdministratorCredential			
+        ($oldToken, $context, $newToken) = ImpersonateAs -cred $DomainAdministratorCredential
 
-		$IPAddress = ([System.Net.DNS]::GetHostAddresses("$ServiceName.cloudapp.net")).IPAddressToString
 		If (!(Get-ClusterResource "IP Address $IPAddress" -ErrorAction SilentlyContinue))
 		{
-			Write-Verbose "Creating Availability Group IP Address [$IPAddress]"
+			Write-Verbose "Creating Availability Group IP Address [$AvailabilityGroupIPAddress]"
 			$params = @{
-				Address = $IPAddress
+				Address = $AvailabilityGroupIPAddress
 				ProbePort = $LoadBalancerProbePort
 				SubnetMask = "255.255.255.255"
 				Network = (Get-ClusterNetwork)[0].Name
 				OverrideAddressMatch = 1
 				EnableDhcp = 0
 				}
-			Add-ClusterResource "IP Address $IPAddress" -ResourceType "IP Address" -Group $AvailabilityGroupName -ErrorAction Stop | 
+			Add-ClusterResource "IP Address $AvailabilityGroupIPAddress" -ResourceType "IP Address" -Group $AvailabilityGroupName -ErrorAction Stop | 
 				Set-ClusterParameter -Multiple $params -ErrorAction Stop
 		}
 
@@ -99,7 +98,7 @@ function Set-TargetResource
 		Write-Verbose "Setting the Network Name's dependency on the IP Address"
 		Get-ClusterGroup $AvailabilityGroupName  | 
 			Get-ClusterResource | where Name -eq $Name | 
-			Set-ClusterResourceDependency "[IP Address $IPAddress]" -ErrorAction Stop
+			Set-ClusterResourceDependency "[IP Address $AvailabilityGroupIPAddress]" -ErrorAction Stop
 
 		Write-Verbose "Starting the Network Name resource"
 		Start-ClusterResource -Name $Name -ErrorAction Stop | Out-Null
@@ -143,7 +142,7 @@ function Test-TargetResource
         [string] $Name,
 		
 		[Parameter(Mandatory)]
-		$ServiceName,		
+		$AvailabilityGroupIPAddress,
 		
 		[Parameter(Mandatory=$true)]
 		$AvailabilityGroupName,	

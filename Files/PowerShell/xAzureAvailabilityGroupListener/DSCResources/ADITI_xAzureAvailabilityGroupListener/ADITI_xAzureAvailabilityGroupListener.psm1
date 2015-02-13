@@ -50,6 +50,9 @@ function Set-TargetResource
 		
 		[Parameter(Mandatory=$true)]
 		$AvailabilityGroupIPAddress,
+
+        [Parameter(Mandatory=$true)]
+		$AvailabilityGroupName,
 	
 		[UInt32] $PublicPort = 1433,	
 	

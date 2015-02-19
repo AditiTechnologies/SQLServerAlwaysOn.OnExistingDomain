@@ -45,9 +45,6 @@ function Set-TargetResource
         [parameter(Mandatory)]
         [string] $Name,
 		
-		[Parameter(Mandatory)]
-		$ServiceName,		
-		
 		[Parameter(Mandatory=$true)]
 		$AvailabilityGroupIPAddress,
 

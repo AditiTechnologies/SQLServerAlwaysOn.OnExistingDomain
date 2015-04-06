@@ -1,6 +1,6 @@
 {
     "Name": "SQLServerAlwaysOn.OnExistingDomain",
-    "Description": "Creates SQL Server 2014 AlwaysOn deployment with disaster recovery on a secondary datacenter. The current version creates the secondary data center infrastructure.It requires existence of an active directory infrastructure with It requires existence of an active directory infrastructure with VNet address space as 10.0.0.0/8, a root domain controller with static IP 10.0.0.8 and DNS server named 'ad-dns1'.",
+    "Description": "Creates SQL Server 2014 AlwaysOn deployment with disaster recovery on a secondary datacenter. The current version creates the secondary datacenter infrastructure.It requires existence of an active directory infrastructure with It requires existence of an active directory infrastructure with VNet address space as 10.0.0.0/8, a root domain controller with static IP 10.0.0.8 and DNS server named 'ad-dns1'.",
     "Version": "0.2.1",
         "Parameters": [
         {
@@ -29,7 +29,7 @@
 		{
             "Name": "PrimaryVnetName",
             "Type": "String",
-            "Description": "Name of Azure Virtual Network in the secondary datacenter for disaster recovery. This should already exist with address space 10.0.0.0/8 and having a gateway subnet with address prefix as 10.20.4.0/28, root domain controller with IP Address as 10.0.0.8 and a DNS server named 'ad-dns1'."
+            "Description": "Name of Azure Virtual Network in the primary datacenter for disaster recovery. This should already exist with address space 10.0.0.0/8 and having a gateway subnet with address prefix as 10.20.4.0/28, root domain controller with IP Address as 10.0.0.8 and a DNS server named 'ad-dns1'."
         },
 		{
             "Name": "PrimaryVnetGatewayConnectionKey",

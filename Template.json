@@ -2,7 +2,7 @@
     "Name": "SQLServerAlwaysOn.OnExistingDomain",
     "Description": "Creates SQL Server 2014 AlwaysOn deployment with disaster recovery on a secondary datacenter. The current version creates configures the SQL availability group.It requires existence of an active directory infrastructure. It requires existence of an active directory infrastructure with VNet address space as 10.0.0.0/8, a root domain controller with static IP 10.0.0.8 and DNS server named 'ad-dns1'.",
     "Version": "0.2.3",
-    Parameters": [
+    "Parameters": [
         {
             "Name": "Region",
             "Type": "String",

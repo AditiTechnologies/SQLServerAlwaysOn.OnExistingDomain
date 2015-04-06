@@ -1,77 +1,51 @@
 {
     "Name": "SQLServerAlwaysOn.OnExistingDomain",
-    "Description": "Creates SQL Server 2014 AlwaysOn deployment. It requires existence of an active directory infrastructure.",
-    "Version": "0.1.0",
-    "Parameters": [
+    "Description": "Creates SQL Server 2014 AlwaysOn deployment with disaster recovery on a secondary datacenter. The current version creates configures the SQL availability group.It requires existence of an active directory infrastructure. It requires existence of an active directory infrastructure with VNet address space as 10.0.0.0/8, a root domain controller with static IP 10.0.0.8 and DNS server named 'ad-dns1'.",
+    "Version": "0.2.3",
+    Parameters": [
         {
             "Name": "Region",
             "Type": "String",
-            "TypeHint": "AzureRegionName",
-            "Description": "Azure region to which the infrastructure will be deployed."
+			"TypeHint": "AzureRegionName",
+            "Description": "Azure region to which the secondary datacenter infrastructure will be deployed. This should be different from the primary datacenter's region."			
         },
         {
             "Name": "AffinityGroup",
             "Type": "String",
-            "TypeHint": "AzureAffinityGroupName",
-            "Description": "Azure affinity group to which the infrastructure will be deployed."
+			"TypeHint": "AzureAffinityGroupName",
+            "Description": "Azure affinity group to which the secondary datacenter infrastructure will be deployed."
         },
         {
             "Name": "VnetName",
             "Type": "String",
-            "Description": "Name of Azure Virtual Network to be used for setting up SQL Availability Group. This should already exist."
-        },
-        {
-            "Name": "VnetAddressSpace",
-            "Type": "String",
-            "Description": "Address space of Azure Virtual Network to be used for setting up SQL Availability Group.",
-            "Default": "10.0.0.0/8"
-        },
-        {
-            "Name": "SqlSubnetName",
-            "Type": "String",
-            "Description": "Name of subnet ithin which SQL Availability Group VMs will be created.",
-            "Default": "sqlag-cluster"
-        },
-        {
-            "Name": "SqlSubnetAddressSpace",
-            "Type": "String",
-            "Description": "Address space of subnet within which SQL Availability Group VMs will be created.",
-            "Default": "10.20.2.0/24"
+            "Description": "Azure Virtual Network containing the SQL Availability Group's secondary datacenter VMs. This should be different from the one which will host the primary datacenter SQL Availability Group VMs."
         },
         {
             "Name": "DiskStore",
             "Type": "String",
-            "TypeHint": "AzureStorageName",
-            "Description": "Name of Azure storage account for creating VM disks. Will be created only if it does not already exists. If it exists then it should lie in the specified affinity group."
+			"TypeHint": "AzureStorageName",
+            "Description": "Name of Azure storage account for creating secondary datacenter VM disks. This should be different from the one which will host the primary datacenter SQL Availability Group VMs."
         },
         {
             "Name": "FQDN",
             "Type": "String",
             "TypeHint": "domain",
-            "Description": "Fully qualified name of the domain configured in the specified Azure Virtual Network.",
+            "Description": "Fully qualified domain name which is being used for setting up active directory. The domain should have been already configured in the primary datacenter.",
             "Minimum": 1,
             "Maximum": 64
         },
         {
-            "Name": "Domain",
-            "Type": "String",
-            "TypeHint": "domain",
-            "Description": "NetBios name of the domain configured in the specified Azure Virtual Network.",
-            "Minimum": 1,
-            "Maximum": 64
-        },
-        {
-            "Name": "CloudService",
+            "Name": "DRCloudService",
             "Type": "String",
             "TypeHint": "AzureCloudServiceName",
-            "Description": "Name of the SQL Availability Group Azure Cloud Service."
+            "Description": "Name of the Azure Cloud Service."
         },
         {
-            "Name": "VMSize",
+            "Name": "DRSQLVMSize",
             "Type": "String",
             "TypeHint": "AzureRoleSize",
-            "Description": "Size of the SQL VM.",
-            "Default": "Small"
+            "Description": "Size of the secondary datacenter SQL VM. The minimum recommended size is 'Large'.",
+            "Default": "Large"
         },
         {
             "Name": "AdminName",
@@ -90,11 +64,11 @@
             "Minimum": 8,
             "Maximum": 127
         },
-        {
+		{
             "Name": "DomainJoinUserName",
             "Type": "String",
             "TypeHint": "username",
-            "Description": "Domain user account which is to be used for joining the SQL Availability Group VMs to domain. This user account must be a member of the group 'Domain Admins'.",
+            "Description": "Domain user account which is to be used for joining the disaster recovery VMs to domain. This user account must be a member of the group 'Domain Admins'.",
             "Minimum": 1,
             "Maximum": 64
         },
@@ -102,42 +76,20 @@
             "Name": "DomainJoinUserPassword",
             "Type": "String",
             "TypeHint": "password",
-            "Description": "Password of user account which is to be used for joining the SQL Availability Group VMs to domain.",
+            "Description": "Password of user account which is to be used for joining disaster recovery VMs to domain.",
             "MaskValue": true,
             "Minimum": 8,
             "Maximum": 127
         },
         {
-            "Name": "AvailabilityGroupName",
-            "Type": "String",
-            "Description": "Name of SQL Server Availability Group. This has to be unique in the domain(setup within the virtual network).",
-            "Minimum": 1,
-            "Maximum": 32
-        },
-        {
-            "Name": "DatabaseName",
-            "Type": "String",
-            "Description": "Name of the database which is to be added to the SQL Server Availability Group. This is optional.",
-            "Maximum": 64,
-			"Default":""
-        },
-        {
-            "Name": "NumberOfSQLNodes",
-            "Type": "Number",
-            "Description": "No of SQL nodes. A minimum of two are required to create SQL Server Availability Group.",
-            "Default": 2,
-            "Minimum": 2,
-            "Maximum": 5
-        },
-        {
             "Name": "SqlAdminPassword",
             "Type": "String",
             "TypeHint": "password",
-            "Description": "Password for SQL 'sa' account.",
+            "Description": "Password for SQL sa account.",
             "Minimum": 1,
             "Maximum": 64
         },
-        {
+		{
             "Name": "SqlSvcAccountName",
             "Type": "String",
             "TypeHint": "username",
@@ -145,7 +97,7 @@
             "Minimum": 1,
             "Maximum": 64
         },
-        {
+		{
             "Name": "SqlSvcAccountPassword",
             "Type": "String",
             "TypeHint": "password",
@@ -153,26 +105,31 @@
             "MaskValue": true,
             "Minimum": 1,
             "Maximum": 64
+        },
+		{
+            "Name": "NumberOfPrimaryDatacenterSQLNodes",
+            "Type": "Number",
+            "Description": "No of SQL nodes in the primary datacenter.",
+            "Default": 2,
+            "Minimum": 2,
+            "Maximum": 5
+        },
+		{
+            "Name": "AvailabilityGroupName",
+            "Type": "String",
+            "Description": "Name of SQL Server Availability Group.",
+            "Minimum": 1,
+            "Maximum": 32
+        },
+		{
+            "Name": "DatabaseName",
+            "Type": "String",
+            "Description": "Name of the database which is to be added to the SQL Server Availability Group.",
+            "Maximum": 64
         }
-		{% assign ClusterName = AvailabilityGroupName | append: 'Cluster' -%}
+		{% assign fqdnSplit = FQDN | split: '.' -%}
+		{% assign Domain = fqdnSplit[0] -%}
     ],
-    "Network": {
-        "VirtualSites": [
-            {
-                "Name": "{{VnetName}}",
-                "AffinityGroup": "{{AffinityGroup}}",
-                "AddressSpace": [
-                    "{{VnetAddressSpace}}"
-                ],
-                "Subnets": [
-                    {
-                        "Name": "{{SqlSubnetName}}",
-                        "AddressPrefix": "{{SqlSubnetAddressSpace}}"
-                    }
-                ]
-            }
-        ]
-    },
     "AffinityGroup": {
         "Name": "{{AffinityGroup}}",
         "Region": "{{Region}}",
@@ -186,57 +143,42 @@
             "Description": "A non-georedundant disk store",
             "DisableGeoReplication": true
         }
-    ],
-    "CloudServices": [
-        {
-            "Name": "{{CloudService}}",
+    ],	
+	"Network": {        
+        "LocalSites": [],
+        "VirtualSites": [
+            {
+                "Name": "{{VnetName}}",
+                "AffinityGroup": "{{DRAffinityGroup}}",
+                "AddressSpace": [
+                    "172.16.0.0/20"
+                ],
+                "Subnets": [
+                    {
+                        "Name": "sql-subnet",
+                        "AddressPrefix": "172.16.2.0/28"
+                    }
+                ]
+            }
+        ]
+    },
+    "CloudServices": [		
+		{
+            "Name": "{{DRCloudService}}",
             "AffinityGroup": "{{AffinityGroup}}",
             "Region": "{{Region}}",
-            "Description": "SQL Server AlwaysOn deployment",
+            "Description": "SQL Server AlwaysOn disaster recovery VM setup.",
             "Deployment": {
                 "VirtualNetwork": "{{VnetName}}",
                 "VirtualMachines": [
                     {
-                        "Name": "quorum",
-                        "RoleSize": "Small",
+                        "Name": "drsql1",
+                        "RoleSize": "{{DRSQLVMSize}}",
                         "Subnets": [
-                            "{{SqlSubnetName}}"
+                            "sql-subnet"
                         ],
-                        "AvailabilitySet": "sqlag-avs",
-                        "OsVirtualDisk": {
-                            "OsType": "Windows",
-                            "OsImageName": "a699494373c04fc0bc8f2bb1389d6106__Windows-Server-2012-R2-*"
-                        },
-                        "DataVirtualDisks": [
-                            {
-                                "DiskId": "disk0",
-                                "Lun": 0,
-                                "LogicalSizeInGB": 40
-                            }
-                        ],
-                        "WindowsConfigSet": {
-                            "LocalAdminCredentialId": "DomainAdmin:local",
-                            "EnableAutomaticUpdates": false,
-                            "ChangePasswordAtLogon": false,
-                            "DisableRdp": false,
-                            "DomainJoinSettings": {
-                                "DomainToJoin": "{{FQDN}}",
-                                "CredentialId": "DomainJoinCred"
-                            }
-                        },
-                        "ConfigSets": [
-                            "SSAONode",
-                            "FailoverCluster"
-                        ]
-                    }
-					{% for i in (1..NumberOfSQLNodes) -%}
-                    ,{
-                        "Name": "sql{{i}}",
-                        "RoleSize": "{{VMSize}}",
-                        "Subnets": [
-                            "{{SqlSubnetName}}"
-                        ],
-                        "AvailabilitySet": "sqlag-avs",
+						"StaticVNetIPAddress": "172.16.2.5",
+                        "AvailabilitySet": "sqlha-avs",
                         "OsVirtualDisk": {
                             "OsType": "Windows",
                             "OsImageName": "fb83b3509582419d99629ce476bcb5c8__SQL-Server-2014-RTM-12.0.2361.0-Enterprise-ENU-Win2012R2-cy14su05"
@@ -259,18 +201,25 @@
                             }
                         },
                         "ConfigSets": [
-                            "SSAONode",
-                            "FailoverCluster",
-                            "SqlAlwaysOnNode"
+                            "CreateSqlAG"
                         ]
                     }
-					{% endfor -%}
                 ],
-                "DiskStorageAccount": "{{DiskStore}}"
+                "DiskStorageAccount": "{{DiskStore}}",
+				"InternalLoadBalancer": {
+					"Name": "DRAGListenerLB",
+					"Subnet": "sql-subnet",
+					"StaticVNetIPAddress":"172.16.2.10"
+				}
             }
         }
-    ],
+    ],    
     "Credentials": [
+		{
+		  "Name": "DomainAdmin",
+		  "UserName": "{{Domain}}\\{{AdminName}}",
+		  "Password": "{{AdminPassword}}"
+		},
         {
             "Name": "DomainAdmin:local",
             "UserName": "{{AdminName}}",
@@ -282,27 +231,11 @@
             "Password": "{{DomainJoinUserPassword}}"
         }
     ],
-    "ConfigSets": [
+    "ConfigSets": [                 
         {
-            "Name": "SSAONode",
-            "Description": "All VMs within the SqlAlwaysOn deployment. This is typically made of the SQL nodes and a single quorum node.",
-            "Endpoints": [],
-            "ConfigurationIds": [
-                "InitializeSSAONode"
-            ]
-        },
-        {
-            "Name": "FailoverCluster",
-            "Description": "Failover cluster setup",
-            "Endpoints": [],
-            "ConfigurationIds": [
-                "SetupFailoverCluster"
-            ]
-        },
-        {
-            "Name": "SqlAlwaysOnNode",
-            "Description": "All SQL VMs within the SqlAlwaysOn deployment.",
-            "Endpoints": [
+            "Name": "CreateSqlAG",
+            "Description": "SQL VMs within the SqlAlwaysOn deployment.",
+			"Endpoints": [
                 {
                     "Name": "AGListener",
                     "LocalPort": 1433,
@@ -310,360 +243,43 @@
                     "Port": 1433,
                     "EnableDirectServerReturn": true,
                     "Rules": [],
+					"InternalLoadBalancerName": "DRAGListenerLB",
                     "LoadBalancerProbe": {
                         "Name": "AGListener-LB",
                         "Protocol": "tcp",
                         "Port": 59999
                     }
                 }
-            ],
+			],
             "ConfigurationIds": [
-                "SetupSqlAlwaysOn"
+				"InitSqlAlwaysOn",
+				"CreateSqlAvailabilityGroup"
             ]
         }
     ],
-    "Configurations": [
+    "Configurations": [               
         {
-            "Name": "InitializeSSAONode",
-            "Description": "Initializes VMs in the SqlServerAlwaysOn cloud service",
+            "Name": "InitSqlAlwaysOn",
+            "Description": "Enabled SQL AlwaysOn feature on the node.",
             "Resources": [
-                {
-                    "Type": "xFormatDisks",
-                    "ImportModule": "xAzureDataDisks",
-                    "ImportTypeName": "ADITI_xFormatDisks",
-                    "Name": "FormatRawDisks",
-                    "Args": {
-                        "FirstDriveLetter": "F"
-                    }
-                },
-                {
-                    "Type": "WindowsFeature",
-                    "ImportModule": null,
-                    "ImportTypeName": null,
-                    "Name": "FailoverClustering",
-                    "Args": {
-                        "Name": "Failover-Clustering",
-                        "Ensure": "Present",
-                        "IncludeAllSubFeature": "true",
-                        "LogPath": "%BrewmasterDir%\\Logs\\Install-FailoverCluster.log"
-                    }
-                },
-                {
-                    "Type": "WindowsFeature",
-                    "ImportModule": null,
-                    "ImportTypeName": null,
-                    "Name": "RSATClusteringMgmt",
-                    "Args": {
-                        "Name": "RSAT-Clustering-Mgmt",
-                        "Ensure": "Present",
-                        "IncludeAllSubFeature": "true",
-                        "LogPath": "%BrewmasterDir%\\Logs\\Install-RSATClusteringMgmt.log"
-                    },
-                    "Requires": [
-                        "[WindowsFeature]FailoverClustering"
-                    ]
-                },
-                {
-                    "Type": "WindowsFeature",
-                    "ImportModule": null,
-                    "ImportTypeName": null,
-                    "Name": "RSATClusteringPowerShell",
-                    "Args": {
-                        "Name": "RSAT-Clustering-PowerShell",
-                        "Ensure": "Present",
-                        "IncludeAllSubFeature": "true",
-                        "LogPath": "%BrewmasterDir%\\Logs\\Install-RSATClusteringPowershell.log"
-                    },
-                    "Requires": [
-                        "[WindowsFeature]RSATClusteringMgmt"
-                    ]
-                },
-                {
-                    "Type": "WindowsFeature",
-                    "ImportModule": null,
-                    "ImportTypeName": null,
-                    "Name": "RSATClusteringCmdInterface",
-                    "Args": {
-                        "Name": "RSAT-Clustering-CmdInterface",
-                        "Ensure": "Present",
-                        "IncludeAllSubFeature": "true",
-                        "LogPath": "%BrewmasterDir%\\Logs\\Install-RSATClusteringCmdInterface.log"
-                    },
-                    "Requires": [
-                        "[WindowsFeature]RSATClusteringPowerShell"
-                    ]
-                },
-                {
-                    "Type": "WindowsFeature",
-                    "ImportModule": null,
-                    "ImportTypeName": null,
-                    "Name": "RSATADPowershell",
-                    "Args": {
-                        "Name": "RSAT-AD-Powershell",
-                        "Ensure": "Present",
-                        "IncludeAllSubFeature": "true",
-                        "LogPath": "%BrewmasterDir%\\Logs\\Install-RSATADPowershell.log"
-                    },
-                    "Nodes": [
-                        "{{CloudService}}.sql1"
-                    ]
-                },
-                {
-                    "Type": "xADUser",
-                    "ImportModule": "xActiveDirectory",
-                    "ImportTypeName": "MSFT_xADUser",
-                    "Name": "CreateSqlServiceDomainAccount",
-                    "Args": {
-                        "DomainName": "{{FQDN}}",
-                        "DomainAdministratorCredential": "%%New-Object PSCredential '{{Domain}}\\{{DomainJoinUserName}}', (ConvertTo-SecureString '{{DomainJoinUserPassword}}' -AsPlainText -Force)",
-                        "UserName": "{{SqlSvcAccountName}}",
-                        "Password": "%%New-Object PSCredential '{{Domain}}\\{{SqlSvcAccountName}}', (ConvertTo-SecureString '{{SqlSvcAccountPassword}}' -AsPlainText -Force)",
-                        "Ensure": "Present"
-                    },
-                    "Nodes": [
-                        "{{CloudService}}.sql1"
-                    ],
-                    "Requires": [
-                        "[WindowsFeature]RSATADPowershell"
-                    ]
-                },
-                {
-                    "Type": "File",
-                    "ImportModule": null,
-                    "ImportTypeName": null,
-                    "Name": "CreateBackupFolder",
-                    "Args": {
-                        "DestinationPath": "F:\\backup",
-                        "Type": "Directory",
-                        "Ensure": "Present",
-                        "Force": "False"
-                    },
-                    "Nodes": [
-                        "{{CloudService}}.quorum"
-                    ]
-                },
-                {
-                    "Type": "File",
-                    "ImportModule": null,
-                    "ImportTypeName": null,
-                    "Name": "CreateQuorumFolder",
-                    "Args": {
-                        "DestinationPath": "F:\\quorum",
-                        "Type": "Directory",
-                        "Ensure": "Present",
-                        "Force": "False"
-                    },
-                    "Nodes": [
-                        "{{CloudService}}.quorum"
-                    ]
-                },
-                {
-                    "Type": "xSmbShare",
-                    "ImportModule": "xSmbShare",
-                    "ImportTypeName": "MSFT_xSmbShare",
-                    "Name": "CreateBackupShare",
-                    "Args": {
-                        "Name": "backup",
-                        "Path": "F:\\backup",
-                        "FullAccess": "everyone",
-                        "Ensure": "Present",
-                        "Description": "Database [{{DatabaseName}}] backup folder"
-                    },
-                    "Nodes": [
-                        "{{CloudService}}.quorum"
-                    ],
-                    "Requires": [
-                        "[File]CreateQuorumFolder"
-                    ],
-                    "Description": null
-                },
-                {
-                    "Credential": "DomainAdmin:local",
-                    "Type": "Script",
-                    "ImportModule": null,
-                    "ImportTypeName": null,
-                    "Name": "AddDomainAdminToLocalAdminGroup",
-                    "GetScript": "@{ exists = (net localgroup administrators) -contains $acctname }",
-                    "SetScript": "$users = (net localgroup administrators)\r\nif ($users -notcontains $acctname)\r\n{\r\n\tWrite-Verbose \"Adding [$acctname] to local administators group.\"\r\n\tnet localgroup administrators $acctname /Add | Out-Null\r\n}",
-                    "TestScript": null,
-                    "Args": {
-                        "acctname": "{{Domain}}\\{{DomainJoinUserName}}"
-                    }
-                }
-            ]
-        },
-        {
-            "Name": "SetupFailoverCluster",
-            "Description": "Create failover cluster",
-            "Resources": [
-                {
-                    "Type": "xAzureCluster",
-                    "ImportModule": "xAzureFailOverCluster",
-                    "ImportTypeName": "ADITI_xAzureCluster",
-                    "Name": "CreateFailoverCluster",
-                    "Args": {
-                        "Name": "{{ClusterName}}",
-                        "NumberOfSQLNodes": "%%{{NumberOfSQLNodes}}",
-                        "DomainAdministratorCredential": "%%New-Object PSCredential '{{Domain}}\\{{DomainJoinUserName}}', (ConvertTo-SecureString '{{DomainJoinUserPassword}}' -AsPlainText -Force)"
-                    },
-                    "Nodes": [
-                        "{{CloudService}}.sql1"
-                    ]
-                },
-                {
-                    "Type": "xWaitForAzureCluster",
-                    "ImportModule": "xAzureFailOverCluster",
-                    "ImportTypeName": "ADITI_xWaitForAzureCluster",
-                    "Name": "WaitForFailoverCluster",
-                    "Args": {
-                        "Name": "{{ClusterName}}",
-                        "RetryIntervalSec": "%%10",
-                        "RetryCount": "%%100",
-                        "DomainAdministratorCredential": "%%New-Object PSCredential '{{Domain}}\\{{DomainJoinUserName}}', (ConvertTo-SecureString '{{DomainJoinUserPassword}}' -AsPlainText -Force)"
-                    }
-                },
-                {
-                    "Type": "xSmbShare",
-                    "ImportModule": "xSmbShare",
-                    "ImportTypeName": "MSFT_xSmbShare",
-                    "Name": "CreateQuorumShare",
-                    "Args": {
-                        "Name": "quorum",
-                        "Path": "F:\\quorum",
-                        "FullAccess": "%%\"{{Domain}}\\{{DomainJoinUserName}}\",\"{{Domain}}\\{{ClusterName}}$\"",
-                        "Ensure": "Present",
-                        "Description": "Failover cluster [{{ClusterName}}] quorum file share"
-                    },
-                    "Nodes": [
-                        "{{CloudService}}.quorum"
-                    ],
-                    "Requires": [
-                        "[xWaitForAzureCluster]WaitForFailoverCluster"
-                    ]
-                },
-                {
-                    "Type": "xWaitForAzureClusterQuorumShare",
-                    "ImportModule": "xAzureFailOverCluster",
-                    "ImportTypeName": "ADITI_xWaitForAzureClusterQuorumShare",
-                    "Name": "WaitForClusterQuorumShare",
-                    "Args": {
-                        "QuorumShare": "\\\\quorum\\quorum",
-                        "RetryIntervalSec": "%%10",
-                        "RetryCount": "%%60",
-                        "DomainAdministratorCredential": "%%New-Object PSCredential '{{Domain}}\\{{DomainJoinUserName}}', (ConvertTo-SecureString '{{DomainJoinUserPassword}}' -AsPlainText -Force)"
-                    },
-                    "Nodes": [
-                        "{{CloudService}}.sql1"
-                    ]
-                },
-                {
-                    "Type": "xAzureClusterQuorumMode",
-                    "ImportModule": "xAzureFailOverCluster",
-                    "ImportTypeName": "ADITI_xAzureClusterQuorumMode",
-                    "Name": "CreateClusterQuorumNode",
-                    "Args": {
-                        "QuorumShare": "\\\\quorum\\quorum",
-                        "DomainAdministratorCredential": "%%New-Object PSCredential '{{Domain}}\\{{DomainJoinUserName}}', (ConvertTo-SecureString '{{DomainJoinUserPassword}}' -AsPlainText -Force)"
-                    },
-                    "Nodes": [
-                        "{{CloudService}}.sql1"
-                    ],
-                    "Requires": [
-                        "[xWaitForAzureClusterQuorumShare]WaitForClusterQuorumShare"
-                    ]
-                }
-            ]
-        },
-        {
-            "Name": "SetupSqlAlwaysOn",
-            "Description": "Setup SQL AlwaysOn",
-            "Resources": [
-                {
-                    "Type": "xFirewall",
-                    "ImportModule": "xNetworking",
-                    "ImportTypeName": "MSFT_xFirewall",
-                    "Name": "SqlServerTcpInRule",
-                    "Args": {
-                        "Name": "SQLServerTCPIn",
-                        "Description": "SQL Server (TCP In)",
-                        "LocalPort": "1433",
-                        "Protocol": "TCP",
-                        "Access": "Allow",
-                        "State": "Enabled",
-                        "Direction": "Inbound"
-                    }
-                },
-                {
-                    "Type": "xFirewall",
-                    "ImportModule": "xNetworking",
-                    "ImportTypeName": "MSFT_xFirewall",
-                    "Name": "SqlServerHAReplicaRule",
-                    "Args": {
-                        "Name": "SQLServerHAReplica",
-                        "Description": "SQL High Availability Replica Endpoint",
-                        "LocalPort": "5022",
-                        "Protocol": "TCP",
-                        "Access": "Allow",
-                        "State": "Enabled",
-                        "Direction": "Inbound"
-                    }
-                },
-                {
-                    "Type": "xFirewall",
-                    "ImportModule": "xNetworking",
-                    "ImportTypeName": "MSFT_xFirewall",
-                    "Name": "SqlServerLoadBalancedEndpointRule",
-                    "Args": {
-                        "Name": "SQL AG Listener LB Probe (TCP-In)",
-                        "Description": "SQL AG Listener LB Probe (TCP-In)",
-                        "LocalPort": "59999",
-                        "Protocol": "TCP",
-                        "Access": "Allow",
-                        "State": "Enabled",
-                        "Direction": "Inbound"
-                    }
-                },
-                {
-                    "Credential": "DomainAdmin:local",
-                    "Type": "Script",
-                    "ImportModule": null,
-                    "ImportTypeName": null,
-                    "Name": "ConfigureSqlDbaAccount",
-                    "GetScript": "@{ SqlSvrAdminAcct = Invoke-SqlCmd -Query \"exec sp_helpsrvrolemember 'sysadmin'\" -ServerInstance '.' -EA Continue | where MemberName -eq 'sa' }",
-                    "SetScript": "[System.Reflection.Assembly]::LoadWithPartialName('Microsoft.SqlServer.SMO')\r\n$s = new-object ('Microsoft.SqlServer.Management.Smo.Server') $env:COMPUTERNAME\r\n$s.Settings.LoginMode = [Microsoft.SqlServer.Management.SMO.ServerLoginMode]::Mixed\r\n$s.Alter()\r\n$list = Get-Service -Name MSSQL*\r\nforeach ($s in $list)\r\n{\r\n   Set-Service -Name $s.Name -StartupType Automatic\r\n   if ($s.Status -ne \"Stopped\")\r\n   {\r\n       $s.Stop()\r\n       $s.WaitForStatus(\"Stopped\")\r\n       $s.Refresh()\r\n   }\r\n   if ($s.Status -ne \"Running\")\r\n   {\r\n      $s.Start()\r\n      $s.WaitForStatus(\"Running\")\r\n      $s.Refresh()\r\n   }\r\n}\r\nInvoke-SqlCmd -Query \"ALTER LOGIN sa ENABLE\" -ServerInstance \".\"\r\nInvoke-SqlCmd -Query \"ALTER LOGIN sa WITH PASSWORD = '$SqlAdminPassword'\" -ServerInstance \".\"\r\n",
-                    "TestScript": null,
-                    "Args": {
-                        "SqlAdminPassword": "{{SqlAdminPassword}}"
-                    },
-                    "Nodes": [],
-                    "Requires": [
-                        "[xFirewall]SqlServerTcpInRule",
-                        "[xFirewall]SqlServerHAReplicaRule",
-                        "[xFirewall]SqlServerLoadBalancedEndpointRule"
-                    ],
-                    "Description": "Enables SQL authentication and the built-in sa account"
-                },
                 {
                     "Type": "xSqlHAService",
-                    "ImportModule": "xAzureAvailabilityGroup",
+                    "ImportModule": "xAzureAvailabilityGroupDR",
                     "ImportTypeName": "MSFT_xSqlHAService",
                     "Name": "EnableSqlAlwaysOn",
                     "Args": {
                         "InstanceName": "%%$env:COMPUTERNAME",
                         "SqlAdministratorCredential": "%%New-Object PSCredential 'sa', (ConvertTo-SecureString '{{SqlAdminPassword}}' -AsPlainText -Force)",
                         "ServiceCredential": "%%New-Object PSCredential '{{Domain}}\\{{SqlSvcAccountName}}', (ConvertTo-SecureString '{{SqlSvcAccountPassword}}' -AsPlainText -Force)"
-                    },
-                    "Requires": [
-                        "[Script]ConfigureSqlDbaAccount"
-                    ]
+                    }
                 },
-                {
+				{
                     "Credential": "DomainAdmin:local",
                     "Type": "Script",
                     "ImportModule": null,
                     "ImportTypeName": null,
                     "Name": "CreateSqlAlwaysOnEndpoint",
-                    "GetScript": "@{ ServerInstance = $env:COMPUTERNAME; AllowedUser = $ServiceAccount; EndPointName = $EndPointName; PortNumber = $EndPointPort; Configured = [bool] [int](OSQL -S $InstanceName -E -Q \"select count(*) from master.sys.endpoints where name = '$EndPointName'\" -h-1)[0] }",
+                    "GetScript": "@{ ServerInstance = $env:COMPUTERNAME; AllowedUser = $ServiceAccount; EndPointName = $EndPointName; PortNumber = $EndPointPort; Configured = [bool] [int](OSQL -S $env:COMPUTERNAME -E -Q \"select count(*) from master.sys.endpoints where name = '$EndPointName'\" -h-1)[0] }",
                     "SetScript": "\r\n$serverPath   = \"SQLSERVER:\\SQL\\$env:COMPUTERNAME\\Default\"\r\n$endpointPath = \"$serverPath\\Endpoints\\$EndpointName\"\r\nNew-SqlHadrEndpoint -Path $serverPath -Name $EndPointName -Port $EndPointPort -EA Stop | Out-Null\r\nWrite-Verbose \"Created Endpoint [$endpointName] on port [$endpointPort]\"\r\nSet-SqlHadrEndpoint -Path $endpointPath -State \"Started\" -EA Continue | Out-Null\r\nWrite-Verbose \"Starting Endpoint [$EndPointName] (if not already started)\"\r\nInvoke-SqlCmd -Query \"GRANT CONNECT ON ENDPOINT::[$EndPointName] TO [$SqlServiceAccount]\" -ServerInstance $env:COMPUTERNAME\r\nWrite-Verbose \"Granting endpoint connect permissions to [$SqlServiceAccount]\"",
                     "TestScript": "$endpoint = OSQL -S $env:COMPUTERNAME -E -Q \"select count(*) from master.sys.endpoints where name = '$EndPointName'\" -h-1\r\nreturn ([bool] [int] $endpoint[0].Trim() )",
                     "Args": {
@@ -675,69 +291,57 @@
                         "[xSqlHAService]EnableSqlAlwaysOn"
                     ],
                     "Description": "Creates SQL Server mirroring endpoint for participating in availability group."
-                },
-                {
+                }
+            ]
+        },
+		{
+			"Name": "CreateSqlAvailabilityGroup",
+            "Description": "Creates SQL availability group.",
+            "Resources": [                
+				{
                     "Type": "xSqlHAGroup",
-                    "ImportModule": "xAzureAvailabilityGroup",
+                    "ImportModule": "xAzureAvailabilityGroupDR",
                     "ImportTypeName": "ADITI_xSqlHAGroup",
                     "Name": "CreateAvailabilityGroup",
                     "Args": {
                         "Name": "{{AvailabilityGroupName}}",
-                        "NumberOfSQLNodes": "{{NumberOfSQLNodes}}",
-                        "SQLNodeNamePrefix": "sql",
+                        "NumberOfPrimaryDatacenterSQLNodes": "%%{{NumberOfPrimaryDatacenterSQLNodes}}",
+                        "PrimaryDatacenterSQLNodeNamePrefix": "sql",
                         "EndpointPort": "%%5022",
-                        "SqlAdministratorCredential": "%%New-Object PSCredential 'sa', (ConvertTo-SecureString '{{SqlAdminPassword}}' -AsPlainText -Force)"
-                    },
-                    "Nodes": [
-                        "{{CloudService}}.sql1"
-                    ],
-                    "Requires": [
-                        "[Script]CreateSqlAlwaysOnEndpoint"
-                    ]
-                },
-                {
-                    "Type": "xWaitForSqlHAGroup",
-                    "ImportModule": "xAzureAvailabilityGroup",
-                    "ImportTypeName": "ADITI_xWaitForSqlHAGroup",
-                    "Name": "WaitForAvailabilityGroup",
-                    "Args": {
-                        "Name": "{{AvailabilityGroupName}}",
-                        "PrimaryReplicaInstanceName": "sql1",
-                        "RetryIntervalSec": "%%10",
-                        "RetryCount": "%%60",
                         "SqlAdministratorCredential": "%%New-Object PSCredential 'sa', (ConvertTo-SecureString '{{SqlAdminPassword}}' -AsPlainText -Force)"
                     }
                 },
-                {
+				{
                     "Type": "xSqlHADatabase",
-                    "ImportModule": "xAzureAvailabilityGroup",
+                    "ImportModule": "xAzureAvailabilityGroupDR",
                     "ImportTypeName": "ADITI_xSqlHADatabase",
                     "Name": "SetupAGDatabase",
                     "Args": {
                         "AvailabilityGroupName": "{{AvailabilityGroupName}}",
                         "Database": "{{DatabaseName}}",
                         "DatabaseBackupPath": "\\\\quorum\\backup",
+						"NumberOfPrimaryDatacenterSQLNodes": "%%{{NumberOfPrimaryDatacenterSQLNodes}}",
+                        "PrimaryDatacenterSQLNodeNamePrefix": "sql",
                         "SqlAdministratorCredential": "%%New-Object PSCredential 'sa', (ConvertTo-SecureString '{{SqlAdminPassword}}' -AsPlainText -Force)"
                     },
                     "Requires": [
-                        "[xWaitForSqlHAGroup]WaitForAvailabilityGroup"
+                        "[xSqlHAGroup]CreateAvailabilityGroup"
                     ]
                 },
                 {
                     "Type": "xAzureAvailabilityGroupListener",
-                    "ImportModule": "xAzureAvailabilityGroupListener",
+                    "ImportModule": "xAzureAvailabilityGroupListenerDR",
                     "ImportTypeName": "ADITI_xAzureAvailabilityGroupListener",
                     "Name": "CreateAGListener",
                     "Args": {
                         "Name": "{{AvailabilityGroupName}}Listener",
-                        "ServiceName": "{{CloudService}}",
+                        "PrimaryAvailabilityGroupIPAddress": "10.20.2.100",
+						"SecondaryAvailabilityGroupIPAddress": "172.16.2.10",
+						"PrimarySQLNodeName": "sql1",
                         "AvailabilityGroupName": "{{AvailabilityGroupName}}",
                         "SqlAdministratorCredential": "%%New-Object PSCredential 'sa', (ConvertTo-SecureString '{{SqlAdminPassword}}' -AsPlainText -Force)",
                         "DomainAdministratorCredential": "%%New-Object PSCredential '{{Domain}}\\{{DomainJoinUserName}}', (ConvertTo-SecureString '{{DomainJoinUserPassword}}' -AsPlainText -Force)"
                     },
-                    "Nodes": [
-                        "{{CloudService}}.sql1"
-                    ],
                     "Requires": [
                         "[xSqlHADatabase]SetupAGDatabase"
                     ]

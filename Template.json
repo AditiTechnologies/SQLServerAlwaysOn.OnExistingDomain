@@ -35,7 +35,7 @@
             "Maximum": 64
         },
         {
-            "Name": "DRCloudService",
+            "Name": "DRSQLAGCloudService",
             "Type": "String",
             "TypeHint": "AzureCloudServiceName",
             "Description": "Name of the Azure Cloud Service."
@@ -164,7 +164,7 @@
     },
     "CloudServices": [		
 		{
-            "Name": "{{DRCloudService}}",
+            "Name": "{{DRSQLAGCloudService}}",
             "AffinityGroup": "{{AffinityGroup}}",
             "Region": "{{Region}}",
             "Description": "SQL Server AlwaysOn disaster recovery VM setup.",

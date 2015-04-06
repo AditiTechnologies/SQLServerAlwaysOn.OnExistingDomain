@@ -1,6 +1,6 @@
 {
     "Name": "SQLServerAlwaysOn.OnExistingDomain",
-    "Description": "Creates SQL Server 2014 AlwaysOn deployment with disaster recovery on a secondary datacenter. The current version creates the secondary datacenter infrastructure.It requires existence of an active directory infrastructure with It requires existence of an active directory infrastructure with VNet address space as 10.0.0.0/8, a root domain controller with static IP 10.0.0.8 and DNS server named 'ad-dns1'.",
+    "Description": "Creates SQL Server 2014 AlwaysOn deployment with disaster recovery on a secondary datacenter. The current version creates the secondary datacenter infrastructure.It requires existence of an active directory infrastructure with It requires existence of an active directory infrastructure with VNet address space as 10.0.0.0/8, a root domain controller with static IP 10.0.0.8, root DNS server named 'ad-dns1' and gateway subnet with address space 10.20.4.0/28.",
     "Version": "0.2.1",
         "Parameters": [
         {

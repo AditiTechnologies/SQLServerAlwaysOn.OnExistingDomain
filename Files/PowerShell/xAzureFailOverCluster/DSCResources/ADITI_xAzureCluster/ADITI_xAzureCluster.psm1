@@ -14,7 +14,10 @@ function Get-TargetResource
 		
 		[parameter(Mandatory)]
         [ValidateRange(2,5)]
-        [Uint32] $NumberOfSQLNodes,
+        [Uint32] $NumberOfPrimaryDatacenterSQLNodes,
+
+        [parameter(Mandatory)]
+        [string] $DisasterRecoverySQLNodeName,
         
         [parameter(Mandatory)]
         [PSCredential] $DomainAdministratorCredential
@@ -69,7 +72,10 @@ function Set-TargetResource
 
 		[parameter(Mandatory)]
         [ValidateRange(2,5)]
-        [Uint32] $NumberOfSQLNodes,
+        [Uint32] $NumberOfPrimaryDatacenterSQLNodes,
+
+        [parameter(Mandatory)]
+        [string] $DisasterRecoverySQLNodeName,
         
         [parameter(Mandatory)]
         [PSCredential] $DomainAdministratorCredential
@@ -104,6 +110,27 @@ function Set-TargetResource
         {            
 			$LocalMachineName = $env:COMPUTERNAME
 			$CurrentCluster = New-Cluster -Name $Name -NoStorage -Node $LocalMachineName -ErrorAction Stop
+            #
+			# Now, add the secondary SQL nodes
+			#
+			$allNodes = Get-WmiObject -namespace "root\mscluster" -class MSCluster_Node
+			for($i = 0; $i -lt ($NumberOfPrimaryDatacenterSQLNodes - 1); $i++)
+			{
+				$nodeName = "sql" + ($i + 2)
+				$nodeExists = $allNodes | where { [System.String]::Compare($_.Name, $nodeName, $true) -eq 0 }
+				if (!$nodeExists)
+				{
+					Write-Verbose "Adding node [$nodeName] to cluster..."
+					$CurrentCluster | Add-ClusterNode $nodeName -ErrorAction Stop | Out-Null
+				}
+			}
+            # Add the disaster recovery node
+            $nodeExists = $allNodes | where { [System.String]::Compare($_.Name, $DisasterRecoverySQLNodeName, $true) -eq 0 }
+            if(!$nodeExists)
+            {
+                $CurrentCluster | Add-ClusterNode $DisasterRecoverySQLNodeName -ErrorAction Stop
+            }
+
 			$clusterGroup = $CurrentCluster | Get-ClusterGroup
 			$clusterNameRes = $clusterGroup | Get-ClusterResource "Cluster Name" -ErrorAction Ignore
 			if (!$clusterNameRes -OR $clusterNameRes.State -ne "Online")
@@ -125,7 +152,7 @@ function Set-TargetResource
 				$ipAddress = [System.Net.IPAddress]::Parse($ipinfo.IPv4Address)
 				[byte[]]$ipAddressBytes = $ipAddress.GetAddressBytes();
 				# Increment so as to take into account the quorum node
-				$clusterSize = $NumberOfSQLNodes + 1
+				$clusterSize = $NumberOfPrimaryDatacenterSQLNodes + 1
 				$ipAddressBytes[3] = $ipAddressBytes[3] + ($clusterSize * 4) + 1
 				$ipAddress = [System.Net.IPAddress]$ipAddressBytes
 				$subnetMask = [System.Net.IPAddress]((1 -shl $ipinfo.PrefixLength)-1)
@@ -151,21 +178,6 @@ function Set-TargetResource
 
 			Write-Verbose "Starting cluster (if not already started)."
 			Start-Cluster -Name $Name -ErrorAction Continue | Out-Null
-			
-			#
-			# Now, add the secondary SQL nodes
-			#
-			$allNodes = Get-WmiObject -namespace "root\mscluster" -class MSCluster_Node
-			for($i = 0; $i -lt ($NumberOfSQLNodes - 1); $i++)
-			{
-				$nodeName = "sql" + ($i + 2)
-				$nodeExists = $allNodes | where { [System.String]::Compare($_.Name, $nodeName, $true) -eq 0 }
-				if (!$nodeExists)
-				{
-					Write-Verbose "Adding node [$nodeName] to cluster..."
-					$CurrentCluster | Add-ClusterNode $nodeName -ErrorAction Stop | Out-Null
-				}
-			}
         }        
     }
     finally
@@ -198,7 +210,10 @@ function Test-TargetResource
 
 		[parameter(Mandatory)]
         [ValidateRange(2,5)]
-        [Uint32] $NumberOfSQLNodes,
+        [Uint32] $NumberOfPrimaryDatacenterSQLNodes,
+
+        [parameter(Mandatory)]
+        [string] $DisasterRecoverySQLNodeName,
         
         [parameter(Mandatory)]
         [PSCredential] $DomainAdministratorCredential
@@ -230,7 +245,7 @@ function Test-TargetResource
 					
                     $allNodes = Get-WmiObject -namespace "root\mscluster" -class MSCluster_Node
 					$nodeCount = $allNodes.Length                    
-					$bRet = $nodeCount -eq $NumberOfSQLNodes
+					$bRet = $nodeCount -eq ($NumberOfPrimaryDatacenterSQLNodes + 1)
                     if ($bRet)
                     {
                         Write-Verbose -Message "Cluster $Name has been configured"

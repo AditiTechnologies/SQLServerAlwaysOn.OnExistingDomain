@@ -147,6 +147,14 @@
                 ],
                 "Subnets": [
                     {
+						"Name": "ad-subnet",
+						"AddressPrefix": "10.0.0.0/24"
+					},
+					{
+						"Name": "GatewaySubnet",
+						"AddressPrefix": "10.20.4.0/28"
+					}
+					{
                         "Name": "sqlag-cluster",
                         "AddressPrefix": "10.20.2.0/24"
                     }

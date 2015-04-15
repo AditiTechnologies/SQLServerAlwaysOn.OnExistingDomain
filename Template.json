@@ -155,9 +155,17 @@
                 ],
                 "Subnets": [
                     {
+                        "Name": "ad-subnet",
+                        "AddressPrefix": "172.16.0.0/28"
+                    },
+                    {
                         "Name": "sql-subnet",
                         "AddressPrefix": "172.16.2.0/28"
-                    }
+                    },
+					{
+						"Name": "GatewaySubnet",
+						"AddressPrefix": "172.16.4.0/28"
+					}
                 ]
             }
         ]

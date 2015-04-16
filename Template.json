@@ -143,8 +143,14 @@
             "Description": "A non-georedundant disk store",
             "DisableGeoReplication": true
         }
-    ],	
-	"Network": {        
+    ],
+	"Network": {
+        "DnsServers": [
+            {
+                "Name": "ad-drdns1",
+                "IPAddress": "172.16.0.5"
+            }
+        ],
         "LocalSites": [],
         "VirtualSites": [
             {
@@ -166,6 +172,10 @@
 						"Name": "GatewaySubnet",
 						"AddressPrefix": "172.16.4.0/28"
 					}
+                ],
+                "DnsServers": [
+					"ad-dns1",
+					"ad-drdns1"
                 ]
             }
         ]
